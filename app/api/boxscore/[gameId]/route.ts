@@ -97,8 +97,9 @@ export async function GET(
     const data = await response.json();
     return NextResponse.json(data);
   } catch {
-    // Boxscore not available (game hasn't started yet) — fall back to scoreboard
+    // Boxscore not available (game hasn't started yet) — fall back to scoreboard then schedule
     try {
+      // 1. Try today's live scoreboard first
       const scoreboardRes = await fetch(
         "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json",
         { headers: FETCH_HEADERS, next: { revalidate: 0 } }
@@ -110,13 +111,33 @@ export async function GET(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (g: any) => g.gameId === gameId
         );
-
         if (game) {
           return NextResponse.json(buildFallbackResponse(game, gameId));
         }
       }
+
+      // 2. Not in today's scoreboard — search the full season schedule
+      const scheduleRes = await fetch(
+        "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json",
+        { headers: FETCH_HEADERS, next: { revalidate: 3600 } }
+      );
+
+      if (scheduleRes.ok) {
+        const scheduleData = await scheduleRes.json();
+        const gameDates = scheduleData?.leagueSchedule?.gameDates || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let foundGame: any = null;
+        for (const gd of gameDates) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          foundGame = (gd.games || []).find((g: any) => g.gameId === gameId);
+          if (foundGame) break;
+        }
+        if (foundGame) {
+          return NextResponse.json(buildFallbackResponse(foundGame, gameId));
+        }
+      }
     } catch {
-      // scoreboard also failed
+      // fallbacks failed
     }
 
     return NextResponse.json(
