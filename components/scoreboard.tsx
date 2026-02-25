@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import type { NBAScoreboard, NBAGame } from "@/lib/nba-types";
 import { GameCard } from "@/components/game-card";
-import { RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight, Zap, Trophy, Clock } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 type FilterType = "all" | "live" | "final" | "upcoming";
@@ -101,18 +101,28 @@ export function Scoreboard() {
 
   const games = data?.scoreboard?.games || [];
 
-  const liveGames = games.filter((g) => g.gameStatus === 2);
-  const finalGames = games.filter((g) => g.gameStatus === 3);
-  const upcomingGames = games.filter((g) => g.gameStatus === 1);
+  // Parse game clock "PT05M30.00S" → total seconds remaining
+  function parseClockSeconds(game: NBAGame): number {
+    const clock = game.gameClock || "";
+    const match = clock.match(/PT(\d+)M([\d.]+)S/);
+    if (!match) return 0;
+    return Number(match[1]) * 60 + Number(match[2]);
+  }
 
-  const filteredGames =
-    filter === "live"
-      ? liveGames
-      : filter === "final"
-        ? finalGames
-        : filter === "upcoming"
-          ? upcomingGames
-          : [...liveGames, ...games.filter((g) => g.gameStatus !== 2)];
+  // Sort live games: most advanced first (highest period, then least time remaining)
+  function sortLiveGames(a: NBAGame, b: NBAGame): number {
+    if (b.period !== a.period) return b.period - a.period;
+    return parseClockSeconds(a) - parseClockSeconds(b);
+  }
+
+  // Sort upcoming games by game time (earliest first)
+  function sortUpcomingGames(a: NBAGame, b: NBAGame): number {
+    return new Date(a.gameTimeUTC).getTime() - new Date(b.gameTimeUTC).getTime();
+  }
+
+  const liveGames = games.filter((g) => g.gameStatus === 2).sort(sortLiveGames);
+  const finalGames = games.filter((g) => g.gameStatus === 3);
+  const upcomingGames = games.filter((g) => g.gameStatus === 1).sort(sortUpcomingGames);
 
   const filters: { key: FilterType; label: string; count: number }[] = [
     { key: "all", label: "All Games", count: games.length },
@@ -301,7 +311,10 @@ export function Scoreboard() {
         )}
 
         {/* Empty Filter State */}
-        {!loading && !error && games.length > 0 && filteredGames.length === 0 && (
+        {!loading && !error && games.length > 0 &&
+          ((filter === "live" && liveGames.length === 0) ||
+           (filter === "final" && finalGames.length === 0) ||
+           (filter === "upcoming" && upcomingGames.length === 0)) && (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <p className="text-sm text-muted-foreground">
               No {filter} games right now
@@ -316,12 +329,72 @@ export function Scoreboard() {
           </div>
         )}
 
-        {/* Games Grid */}
-        {!loading && !error && filteredGames.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredGames.map((game: NBAGame) => (
-              <GameCard key={game.gameId} game={game} />
-            ))}
+        {/* Games by sections */}
+        {!loading && !error && games.length > 0 && (
+          <div className="space-y-8">
+            {/* LIVE section */}
+            {(filter === "all" || filter === "live") && liveGames.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[hsl(var(--live))] opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[hsl(var(--live))]" />
+                  </span>
+                  <Zap className="h-3.5 w-3.5 text-[hsl(var(--live))]" />
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-[hsl(var(--live))]">
+                    Live
+                  </h2>
+                  <span className="text-[10px] font-mono text-[hsl(var(--live)/0.6)]">
+                    {liveGames.length}
+                  </span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {liveGames.map((game: NBAGame) => (
+                    <GameCard key={game.gameId} game={game} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* FINAL section */}
+            {(filter === "all" || filter === "final") && finalGames.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <Trophy className="h-3.5 w-3.5 text-muted-foreground" />
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Final
+                  </h2>
+                  <span className="text-[10px] font-mono text-muted-foreground/60">
+                    {finalGames.length}
+                  </span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {finalGames.map((game: NBAGame) => (
+                    <GameCard key={game.gameId} game={game} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* UPCOMING section */}
+            {(filter === "all" || filter === "upcoming") && upcomingGames.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-primary">
+                    Upcoming
+                  </h2>
+                  <span className="text-[10px] font-mono text-primary/60">
+                    {upcomingGames.length}
+                  </span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {upcomingGames.map((game: NBAGame) => (
+                    <GameCard key={game.gameId} game={game} />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 

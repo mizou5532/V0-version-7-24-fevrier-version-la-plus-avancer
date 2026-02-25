@@ -49,6 +49,10 @@ export function GameCard({ game }: { game: NBAGame }) {
   const isFinal = game.gameStatus === 3;
   const timeDisplay = formatGameTime(game);
 
+  const awayColors = NBA_TEAM_COLORS[game.awayTeam.teamTricode] || {
+    primary: "#666",
+    secondary: "#999",
+  };
   const homeColors = NBA_TEAM_COLORS[game.homeTeam.teamTricode] || {
     primary: "#666",
     secondary: "#999",
@@ -113,6 +117,7 @@ export function GameCard({ game }: { game: NBAGame }) {
             isFinal={isFinal}
             leader={game.gameLeaders?.awayLeaders}
             isB2B={getLocalTeamByTricode(game.awayTeam.teamTricode)?.A_JOUE_HIER ?? false}
+            teamColor={awayColors.primary}
           />
 
           <div className="h-px bg-border/50" />
@@ -128,6 +133,7 @@ export function GameCard({ game }: { game: NBAGame }) {
             leader={game.gameLeaders?.homeLeaders}
             isHome
             isB2B={getLocalTeamByTricode(game.homeTeam.teamTricode)?.A_JOUE_HIER ?? false}
+            teamColor={homeColors.primary}
           />
         </div>
 
@@ -197,6 +203,7 @@ function TeamRow({
   leader,
   isHome,
   isB2B,
+  teamColor,
 }: {
   team: NBAGame["homeTeam"];
   isWinning: boolean;
@@ -205,9 +212,16 @@ function TeamRow({
   leader?: NBAGame["gameLeaders"]["homeLeaders"];
   isHome?: boolean;
   isB2B?: boolean;
+  teamColor: string;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="relative overflow-hidden rounded-lg px-3 py-2 flex items-center gap-3">
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `linear-gradient(90deg, ${teamColor}20 0%, ${teamColor}08 60%, transparent 100%)`,
+        }}
+      />
       <TeamLogo tricode={team.teamTricode} size={36} />
 
       <div className="flex-1 min-w-0">
