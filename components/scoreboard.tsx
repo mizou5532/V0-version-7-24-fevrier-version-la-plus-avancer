@@ -57,6 +57,7 @@ export function Scoreboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [oddsMap, setOddsMap] = useState<Record<string, { home: number; away: number }>>({});
 
   const isToday = selectedDate === getTodayET();
 
@@ -95,6 +96,27 @@ export function Scoreboard() {
     }
   }, [fetchScores, isToday]);
 
+  // Fetch odds once on mount
+  useEffect(() => {
+    fetch("/api/odds")
+      .then((r) => r.json())
+      .then((data) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const map: Record<string, { home: number; away: number }> = {};
+        for (const g of data.games || []) {
+          if (!g.team_odds) continue;
+          const homeOdds = g.team_odds[g.home_team];
+          const awayOdds = g.team_odds[g.away_team];
+          if (homeOdds && awayOdds) {
+            const key = `${g.away_team}|${g.home_team}`;
+            map[key] = { home: homeOdds, away: awayOdds };
+          }
+        }
+        setOddsMap(map);
+      })
+      .catch(() => {});
+  }, []);
+
   const goToPrev = () => setSelectedDate((d) => addDays(d, -1));
   const goToNext = () => setSelectedDate((d) => addDays(d, 1));
   const goToToday = () => setSelectedDate(getTodayET());
@@ -123,6 +145,11 @@ export function Scoreboard() {
   const liveGames = games.filter((g) => g.gameStatus === 2).sort(sortLiveGames);
   const finalGames = games.filter((g) => g.gameStatus === 3);
   const upcomingGames = games.filter((g) => g.gameStatus === 1).sort(sortUpcomingGames);
+
+  function getOddsForGame(game: NBAGame) {
+    const key = `${game.awayTeam.teamCity} ${game.awayTeam.teamName}|${game.homeTeam.teamCity} ${game.homeTeam.teamName}`;
+    return oddsMap[key];
+  }
 
   const filters: { key: FilterType; label: string; count: number }[] = [
     { key: "all", label: "All Games", count: games.length },
@@ -350,7 +377,7 @@ export function Scoreboard() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {liveGames.map((game: NBAGame) => (
-                    <GameCard key={game.gameId} game={game} />
+                    <GameCard key={game.gameId} game={game} odds={getOddsForGame(game)} />
                   ))}
                 </div>
               </section>
@@ -370,7 +397,7 @@ export function Scoreboard() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {finalGames.map((game: NBAGame) => (
-                    <GameCard key={game.gameId} game={game} />
+                    <GameCard key={game.gameId} game={game} odds={getOddsForGame(game)} />
                   ))}
                 </div>
               </section>
@@ -390,7 +417,7 @@ export function Scoreboard() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {upcomingGames.map((game: NBAGame) => (
-                    <GameCard key={game.gameId} game={game} />
+                    <GameCard key={game.gameId} game={game} odds={getOddsForGame(game)} />
                   ))}
                 </div>
               </section>

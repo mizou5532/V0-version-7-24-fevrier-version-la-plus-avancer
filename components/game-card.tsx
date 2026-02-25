@@ -43,7 +43,7 @@ function formatGameTime(game: NBAGame) {
   return game.gameStatusText?.trim() || "FINAL";
 }
 
-export function GameCard({ game }: { game: NBAGame }) {
+export function GameCard({ game, odds }: { game: NBAGame; odds?: { home: number; away: number } }) {
   const status = getGameStatusInfo(game);
   const isLive = game.gameStatus === 2;
   const isFinal = game.gameStatus === 3;
@@ -115,9 +115,12 @@ export function GameCard({ game }: { game: NBAGame }) {
             }
             isLive={isLive}
             isFinal={isFinal}
+            isUpcoming={game.gameStatus === 1}
             leader={game.gameLeaders?.awayLeaders}
             isB2B={getLocalTeamByTricode(game.awayTeam.teamTricode)?.A_JOUE_HIER ?? false}
             teamColor={awayColors.primary}
+            odds={odds?.away}
+            isFavorite={odds ? odds.away < odds.home : undefined}
           />
 
           <div className="h-px bg-border/50" />
@@ -130,10 +133,13 @@ export function GameCard({ game }: { game: NBAGame }) {
             }
             isLive={isLive}
             isFinal={isFinal}
+            isUpcoming={game.gameStatus === 1}
             leader={game.gameLeaders?.homeLeaders}
             isHome
             isB2B={getLocalTeamByTricode(game.homeTeam.teamTricode)?.A_JOUE_HIER ?? false}
             teamColor={homeColors.primary}
+            odds={odds?.home}
+            isFavorite={odds ? odds.home < odds.away : undefined}
           />
         </div>
 
@@ -200,19 +206,25 @@ function TeamRow({
   isWinning,
   isLive,
   isFinal,
+  isUpcoming,
   leader,
   isHome,
   isB2B,
   teamColor,
+  odds,
+  isFavorite,
 }: {
   team: NBAGame["homeTeam"];
   isWinning: boolean;
   isLive: boolean;
   isFinal: boolean;
+  isUpcoming: boolean;
   leader?: NBAGame["gameLeaders"]["homeLeaders"];
   isHome?: boolean;
   isB2B?: boolean;
   teamColor: string;
+  odds?: number;
+  isFavorite?: boolean;
 }) {
   return (
     <div className="relative overflow-hidden rounded-lg px-3 py-2 flex items-center gap-3">
@@ -259,17 +271,29 @@ function TeamRow({
         </div>
       </div>
 
-      <div
-        className={`text-right font-mono text-2xl font-bold tabular-nums ${
-          isWinning
-            ? isLive
-              ? "text-[hsl(var(--live))]"
-              : "text-foreground"
-            : "text-muted-foreground"
-        }`}
-      >
-        {team.score > 0 ? team.score : "-"}
-      </div>
+      {isUpcoming && odds != null ? (
+        <span
+          className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-mono font-bold border ${
+            isFavorite
+              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
+              : "bg-red-500/15 text-red-400 border-red-500/20"
+          }`}
+        >
+          {odds.toFixed(2)}
+        </span>
+      ) : (
+        <div
+          className={`text-right font-mono text-2xl font-bold tabular-nums ${
+            isWinning
+              ? isLive
+                ? "text-[hsl(var(--live))]"
+                : "text-foreground"
+              : "text-muted-foreground"
+          }`}
+        >
+          {team.score > 0 ? team.score : "-"}
+        </div>
+      )}
     </div>
   );
 }
