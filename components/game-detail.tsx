@@ -35,8 +35,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
   const [activeTab, setActiveTab] = useState<Tab>("players");
   const [activeTeam, setActiveTeam] = useState<"away" | "home">("away");
   const [statsView, setStatsView] = useState<StatsView>("game");
-
-
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const fetchBoxScore = useCallback(
     async (showRefresh = false) => {
@@ -48,10 +47,13 @@ export function GameDetail({ gameId }: { gameId: string }) {
         setData(json);
         setError(null);
 
-        // Set default view: season for upcoming, game for live/final
-        const gameStatus = json.game?.gameStatus;
-        if (gameStatus === 1) {
-          setStatsView("season");
+        // Set default view ONLY on the first load, not on refetches
+        if (!initialLoadDone) {
+          const gameStatus = json.game?.gameStatus;
+          if (gameStatus === 1) {
+            setStatsView("season");
+          }
+          setInitialLoadDone(true);
         }
       } catch {
         setError("Unable to load game details.");
@@ -60,7 +62,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
         setIsRefreshing(false);
       }
     },
-    [gameId]
+    [gameId, initialLoadDone]
   );
 
   useEffect(() => {
