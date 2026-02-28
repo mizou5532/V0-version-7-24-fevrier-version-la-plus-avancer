@@ -101,15 +101,16 @@ export function Scoreboard() {
     fetch("/api/odds")
       .then((r) => r.json())
       .then((data) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const map: Record<string, { home: number; away: number }> = {};
         for (const g of data.games || []) {
-          if (!g.team_odds) continue;
-          const homeOdds = g.team_odds[g.home_team];
-          const awayOdds = g.team_odds[g.away_team];
-          if (homeOdds && awayOdds) {
-            const key = `${g.away_team}|${g.home_team}`;
-            map[key] = { home: homeOdds, away: awayOdds };
+          // Match using tricodes for reliable matching with NBA scoreboard data
+          if (g.tricode_odds && g.home_tricode && g.away_tricode) {
+            const homeOdds = g.tricode_odds[g.home_tricode];
+            const awayOdds = g.tricode_odds[g.away_tricode];
+            if (homeOdds && awayOdds) {
+              const key = `${g.away_tricode}|${g.home_tricode}`;
+              map[key] = { home: homeOdds, away: awayOdds };
+            }
           }
         }
         setOddsMap(map);
@@ -147,7 +148,7 @@ export function Scoreboard() {
   const upcomingGames = games.filter((g) => g.gameStatus === 1).sort(sortUpcomingGames);
 
   function getOddsForGame(game: NBAGame) {
-    const key = `${game.awayTeam.teamCity} ${game.awayTeam.teamName}|${game.homeTeam.teamCity} ${game.homeTeam.teamName}`;
+    const key = `${game.awayTeam.teamTricode}|${game.homeTeam.teamTricode}`;
     return oddsMap[key];
   }
 
