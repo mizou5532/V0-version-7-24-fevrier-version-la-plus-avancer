@@ -29,24 +29,33 @@ interface BetSelection {
   odds: number;
 }
 
-// ─── Generate simulated odds based on player stats ───
+// ─── Generate odds based on player stats ───
+// Returns null if the line is too far from the player's average (no real odds available)
 function generateOdds(
   playerAvg: number,
   line: number
-): number {
-  // Simplified odds generation based on how close the line is to the average
+): number | null {
   const diff = line - playerAvg;
   const ratio = diff / Math.max(playerAvg, 1);
 
-  if (ratio <= -0.3) return 1.12;
-  if (ratio <= -0.15) return 1.25;
-  if (ratio <= -0.05) return 1.45;
-  if (ratio <= 0.05) return 1.65;
-  if (ratio <= 0.15) return 1.95;
-  if (ratio <= 0.25) return 2.30;
-  if (ratio <= 0.4) return 2.80;
-  if (ratio <= 0.6) return 3.50;
-  return 4.50;
+  // If the line is way below the average (player almost guaranteed to hit it),
+  // no bookmaker would offer this — return null (not available)
+  if (ratio <= -0.35) return null;
+
+  // If the line is way above the average (extremely unlikely),
+  // also return null — no realistic odds
+  if (ratio > 0.8) return null;
+
+  // Realistic odds range for lines near the player's average
+  if (ratio <= -0.2) return 1.30;
+  if (ratio <= -0.1) return 1.50;
+  if (ratio <= 0.0) return 1.75;
+  if (ratio <= 0.1) return 2.00;
+  if (ratio <= 0.2) return 2.25;
+  if (ratio <= 0.35) return 2.75;
+  if (ratio <= 0.5) return 3.40;
+  if (ratio <= 0.65) return 4.00;
+  return 5.00;
 }
 
 // ─── Fixed prop lines per category ───
@@ -271,12 +280,15 @@ function PlayerPropCard({
                   <div className="flex gap-1.5 flex-wrap">
                     {cat.lines.map((line) => {
                       const odds = generateOdds(cat.avg, line);
-                      const active = isSelected(cat.label, line);
+                      const available = odds !== null;
+                      const active = available && isSelected(cat.label, line);
                       return (
                         <button
                           key={line}
                           type="button"
-                          onClick={() =>
+                          disabled={!available}
+                          onClick={() => {
+                            if (!available) return;
                             onSelect({
                               playerId: player.PLAYER_ID,
                               playerName: player.PLAYER_NAME,
@@ -284,30 +296,42 @@ function PlayerPropCard({
                               category: cat.label,
                               line,
                               odds,
-                            })
-                          }
+                            });
+                          }}
                           className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 rounded-lg border py-2 px-1.5 transition-all duration-200 ${
-                            active
-                              ? "bg-primary/15 border-primary shadow-[0_0_12px_-4px_hsl(var(--primary)/0.4)] ring-1 ring-primary/50"
-                              : "bg-secondary/30 border-border hover:border-primary/30 hover:bg-secondary/60"
+                            !available
+                              ? "bg-secondary/10 border-border/50 opacity-40 cursor-not-allowed"
+                              : active
+                                ? "bg-primary/15 border-primary shadow-[0_0_12px_-4px_hsl(var(--primary)/0.4)] ring-1 ring-primary/50"
+                                : "bg-secondary/30 border-border hover:border-primary/30 hover:bg-secondary/60"
                           }`}
                         >
                           <span
                             className={`text-sm font-bold font-mono ${
-                              active ? "text-primary" : "text-foreground"
+                              !available
+                                ? "text-muted-foreground/50"
+                                : active
+                                  ? "text-primary"
+                                  : "text-foreground"
                             }`}
                           >
                             +{line}
                           </span>
-                          <span
-                            className={`text-[10px] font-mono ${
-                              active
-                                ? "text-primary/80"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {odds.toFixed(2)}
-                          </span>
+                          {available ? (
+                            <span
+                              className={`text-[10px] font-mono ${
+                                active
+                                  ? "text-primary/80"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {odds.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-muted-foreground/40">
+                              X
+                            </span>
+                          )}
                         </button>
                       );
                     })}
