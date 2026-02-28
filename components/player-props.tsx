@@ -49,19 +49,10 @@ function generateOdds(
   return 4.50;
 }
 
-// ─── Generate prop lines for a stat ───
-function generateLines(avg: number): number[] {
-  const base = Math.round(avg * 2) / 2; // round to nearest 0.5
-  const step = avg >= 15 ? 5 : avg >= 6 ? 2.5 : 1.5;
-
-  const lines: number[] = [];
-  const low = Math.max(0.5, base - step);
-  lines.push(low);
-  lines.push(base);
-  lines.push(base + step);
-
-  return lines.map((v) => Math.round(v * 2) / 2);
-}
+// ─── Fixed prop lines per category ───
+const POINTS_LINES = [10, 15, 20, 25, 30];
+const REBOUNDS_LINES = [2, 4, 6, 8, 10];
+const ASSISTS_LINES = [2, 4, 6, 8, 10];
 
 // ─── Bet Slip Content (shared between sidebar and drawer) ───
 function BetSlipContent({
@@ -210,10 +201,10 @@ function PlayerPropCard({
 }) {
   const [expanded, setExpanded] = useState(true);
 
-  const categories: { label: string; avg: number }[] = [
-    { label: "Points", avg: player.PTS },
-    { label: "Rebonds", avg: player.REB },
-    { label: "Assists", avg: player.AST },
+  const categories: { label: string; avg: number; lines: number[] }[] = [
+    { label: "Points", avg: player.PTS, lines: POINTS_LINES },
+    { label: "Rebonds", avg: player.REB, lines: REBOUNDS_LINES },
+    { label: "Assists", avg: player.AST, lines: ASSISTS_LINES },
   ];
 
   const isSelected = (category: string, line: number) =>
@@ -272,14 +263,13 @@ function PlayerPropCard({
         <div className="px-4 pb-4 pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex flex-col gap-3">
             {categories.map((cat) => {
-              const lines = generateLines(cat.avg);
               return (
                 <div key={cat.label}>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
                     {cat.label}
                   </p>
-                  <div className="flex gap-2">
-                    {lines.map((line) => {
+                  <div className="flex gap-1.5 flex-wrap">
+                    {cat.lines.map((line) => {
                       const odds = generateOdds(cat.avg, line);
                       const active = isSelected(cat.label, line);
                       return (
@@ -296,7 +286,7 @@ function PlayerPropCard({
                               odds,
                             })
                           }
-                          className={`flex-1 flex flex-col items-center gap-0.5 rounded-lg border py-2.5 px-2 transition-all duration-200 ${
+                          className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 rounded-lg border py-2 px-1.5 transition-all duration-200 ${
                             active
                               ? "bg-primary/15 border-primary shadow-[0_0_12px_-4px_hsl(var(--primary)/0.4)] ring-1 ring-primary/50"
                               : "bg-secondary/30 border-border hover:border-primary/30 hover:bg-secondary/60"
