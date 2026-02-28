@@ -1,6 +1,7 @@
 "use client";
 
 import type { NbaPlayerLocalStats } from "@/lib/nba-local-data";
+import { PlayerHeadshot } from "@/components/player-headshot";
 import { useState } from "react";
 import {
   ChevronUp,
@@ -313,9 +314,15 @@ function PlayerRow({
         hasHealthConcern && player.GP_L5 === 0 ? "opacity-50" : ""
       }`}
     >
-      {/* Player name + height */}
+      {/* Player name + height + headshot */}
       <td className="px-4 py-2.5 sticky left-0 bg-card z-10">
-        <div className="flex items-center gap-1.5 min-w-[120px]">
+        <div className="flex items-center gap-2 min-w-[150px]">
+          <PlayerHeadshot
+            playerId={player.PLAYER_ID}
+            playerName={player.PLAYER_NAME}
+            size={32}
+            teamColor={teamColor}
+          />
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
               <span

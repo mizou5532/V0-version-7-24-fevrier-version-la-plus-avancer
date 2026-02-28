@@ -1,6 +1,7 @@
 "use client";
 
 import type { BoxScorePlayer } from "@/lib/boxscore-types";
+import { PlayerHeadshot } from "@/components/player-headshot";
 import { useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 
@@ -253,9 +254,12 @@ function PlayerRow({ player, teamColor }: { player: BoxScorePlayer; teamColor: s
     >
       <td className="px-4 py-2 sticky left-0 bg-card z-10">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-muted-foreground/60 w-5 text-center">
-            {player.jerseyNum || "-"}
-          </span>
+          <PlayerHeadshot
+            playerId={player.personId}
+            playerName={player.nameI || player.name || `${player.firstName} ${player.familyName}`}
+            size={32}
+            teamColor={teamColor}
+          />
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span

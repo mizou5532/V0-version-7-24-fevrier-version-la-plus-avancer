@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import type { NbaPlayerLocalStats } from "@/lib/nba-local-data";
 import { TeamLogo } from "@/components/team-logo";
+import { PlayerHeadshot } from "@/components/player-headshot";
 import { X, Trash2, Calculator, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Drawer,
@@ -237,15 +238,12 @@ function PlayerPropCard({
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors"
       >
-        <div
-          className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-          style={{ backgroundColor: teamColor + "25", color: teamColor }}
-        >
-          {player.PLAYER_NAME.split(" ")
-            .map((n) => n[0])
-            .join("")
-            .slice(0, 2)}
-        </div>
+        <PlayerHeadshot
+          playerId={player.PLAYER_ID}
+          playerName={player.PLAYER_NAME}
+          size={36}
+          teamColor={teamColor}
+        />
         <div className="flex-1 text-left min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">
             {player.PLAYER_NAME}
