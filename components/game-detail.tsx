@@ -10,6 +10,7 @@ import { PlayerStatsTable } from "@/components/player-stats-table";
 import { TeamStatsComparison } from "@/components/team-stats-comparison";
 import { SeasonTeamStatsComparison } from "@/components/season-team-stats-comparison";
 import { SeasonPlayerStatsTable } from "@/components/season-player-stats-table";
+import { PlayerProps } from "@/components/player-props";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ArrowLeft,
@@ -19,9 +20,10 @@ import {
   Users,
   TrendingUp,
   Zap,
+  Dices,
 } from "lucide-react";
 
-type StatsView = "game" | "season";
+type StatsView = "game" | "season" | "props";
 type Tab = "players" | "team-stats";
 
 export function GameDetail({ gameId }: { gameId: string }) {
@@ -129,7 +131,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
     <div className="min-h-screen bg-background">
       {/* Navigation */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
+        <div className={`mx-auto px-4 py-3 flex items-center justify-between transition-all ${statsView === "props" ? "max-w-7xl" : "max-w-5xl"}`}>
           <button
             type="button"
             onClick={() => router.push("/")}
@@ -180,7 +182,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className={`mx-auto px-4 py-6 transition-all ${statsView === "props" ? "max-w-7xl" : "max-w-5xl"}`}>
         {/* Scoreboard Hero */}
         <div className="relative rounded-2xl border border-border bg-card overflow-hidden mb-6">
           <div
@@ -452,10 +454,22 @@ export function GameDetail({ gameId }: { gameId: string }) {
               <TrendingUp className="h-3 w-3" />
               Season Stats
             </button>
+            <button
+              type="button"
+              onClick={() => setStatsView("props")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+                statsView === "props"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Dices className="h-3 w-3" />
+              Player Props
+            </button>
           </div>
 
-          {/* Tabs - for game view (when started) and season view */}
-          {((statsView === "game" && hasStarted) || statsView === "season") && (
+          {/* Tabs - for game view (when started) and season view, hidden for props */}
+          {((statsView === "game" && hasStarted) || statsView === "season") && statsView !== "props" && (
             <div className="flex items-center gap-1">
               {tabs.map((tab) => (
                 <button
@@ -671,6 +685,18 @@ export function GameDetail({ gameId }: { gameId: string }) {
               </>
             )}
           </>
+        )}
+
+        {/* ====== PLAYER PROPS VIEW ====== */}
+        {statsView === "props" && (
+          <PlayerProps
+            awayPlayers={awayPlayers}
+            homePlayers={homePlayers}
+            awayTricode={game.awayTeam.teamTricode}
+            homeTricode={game.homeTeam.teamTricode}
+            awayColor={awayColors.primary}
+            homeColor={homeColors.primary}
+          />
         )}
 
         {/* Auto-refresh notice for live */}

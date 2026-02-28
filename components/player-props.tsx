@@ -1,0 +1,529 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import type { NbaPlayerLocalStats } from "@/lib/nba-local-data";
+import { TeamLogo } from "@/components/team-logo";
+import { X, Trash2, Calculator, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+
+// ─── Types ───
+interface PropLine {
+  label: string;
+  values: number[];
+}
+
+interface BetSelection {
+  playerId: number;
+  playerName: string;
+  teamTricode: string;
+  category: string; // "Points" | "Rebounds" | "Assists"
+  line: number;
+  odds: number;
+}
+
+// ─── Generate simulated odds based on player stats ───
+function generateOdds(
+  playerAvg: number,
+  line: number
+): number {
+  // Simplified odds generation based on how close the line is to the average
+  const diff = line - playerAvg;
+  const ratio = diff / Math.max(playerAvg, 1);
+
+  if (ratio <= -0.3) return 1.12;
+  if (ratio <= -0.15) return 1.25;
+  if (ratio <= -0.05) return 1.45;
+  if (ratio <= 0.05) return 1.65;
+  if (ratio <= 0.15) return 1.95;
+  if (ratio <= 0.25) return 2.30;
+  if (ratio <= 0.4) return 2.80;
+  if (ratio <= 0.6) return 3.50;
+  return 4.50;
+}
+
+// ─── Generate prop lines for a stat ───
+function generateLines(avg: number): number[] {
+  const base = Math.round(avg * 2) / 2; // round to nearest 0.5
+  const step = avg >= 15 ? 5 : avg >= 6 ? 2.5 : 1.5;
+
+  const lines: number[] = [];
+  const low = Math.max(0.5, base - step);
+  lines.push(low);
+  lines.push(base);
+  lines.push(base + step);
+
+  return lines.map((v) => Math.round(v * 2) / 2);
+}
+
+// ─── Bet Slip Content (shared between sidebar and drawer) ───
+function BetSlipContent({
+  selections,
+  stake,
+  onStakeChange,
+  onRemove,
+  onClear,
+}: {
+  selections: BetSelection[];
+  stake: string;
+  onStakeChange: (val: string) => void;
+  onRemove: (sel: BetSelection) => void;
+  onClear: () => void;
+}) {
+  const totalOdds = selections.reduce((acc, s) => acc * s.odds, 1);
+  const stakeNum = parseFloat(stake) || 0;
+  const potentialWin = totalOdds * stakeNum;
+
+  return (
+    <div className="flex flex-col h-full">
+      {selections.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8">
+          <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
+            <Calculator className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground text-center">
+            Selectionne des props pour commencer
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-2">
+              {selections.map((sel) => (
+                <div
+                  key={`${sel.playerId}-${sel.category}`}
+                  className="flex items-center gap-2 rounded-lg bg-secondary/50 border border-border px-3 py-2 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-foreground truncate">
+                      {sel.playerName}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {sel.category} +{sel.line} &middot;{" "}
+                      <span className="text-primary font-bold">{sel.teamTricode}</span>
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-primary shrink-0">
+                    {sel.odds.toFixed(2)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(sel)}
+                    className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    aria-label={`Remove ${sel.playerName} ${sel.category}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Calculator section */}
+          <div className="mt-4 pt-4 border-t border-border">
+            {/* Total odds */}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-muted-foreground">Cote Totale</span>
+              <span className="text-sm font-mono font-bold text-primary">
+                {totalOdds.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Stake input */}
+            <div className="relative mb-3">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">$</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Mise"
+                value={stake}
+                onChange={(e) => onStakeChange(e.target.value)}
+                className="w-full rounded-lg border border-border bg-secondary/50 pl-7 pr-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+              />
+            </div>
+
+            {/* Quick stake buttons */}
+            <div className="flex gap-1.5 mb-4">
+              {[5, 10, 25, 50, 100].map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  onClick={() => onStakeChange(String(amount))}
+                  className={`flex-1 rounded-md py-1.5 text-[10px] font-mono font-bold transition-all ${
+                    stake === String(amount)
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                  }`}
+                >
+                  ${amount}
+                </button>
+              ))}
+            </div>
+
+            {/* Potential win */}
+            <div className="rounded-xl bg-primary/10 border border-primary/20 p-4 mb-3">
+              <p className="text-[10px] uppercase tracking-widest text-primary/70 mb-1">
+                Gain Potentiel
+              </p>
+              <p className="text-2xl font-mono font-bold text-primary">
+                ${potentialWin.toFixed(2)}
+              </p>
+            </div>
+
+            {/* Clear button */}
+            <button
+              type="button"
+              onClick={onClear}
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-secondary py-2.5 text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Effacer tout
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Player Prop Card ───
+function PlayerPropCard({
+  player,
+  teamTricode,
+  teamColor,
+  selections,
+  onSelect,
+}: {
+  player: NbaPlayerLocalStats;
+  teamTricode: string;
+  teamColor: string;
+  selections: BetSelection[];
+  onSelect: (sel: BetSelection) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  const categories: { label: string; avg: number }[] = [
+    { label: "Points", avg: player.PTS },
+    { label: "Rebonds", avg: player.REB },
+    { label: "Assists", avg: player.AST },
+  ];
+
+  const isSelected = (category: string, line: number) =>
+    selections.some(
+      (s) =>
+        s.playerId === player.PLAYER_ID &&
+        s.category === category &&
+        s.line === line
+    );
+
+  const hasSelectionInCategory = (category: string) =>
+    selections.some(
+      (s) => s.playerId === player.PLAYER_ID && s.category === category
+    );
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden transition-all">
+      {/* Player header */}
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors"
+      >
+        <div
+          className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+          style={{ backgroundColor: teamColor + "25", color: teamColor }}
+        >
+          {player.PLAYER_NAME.split(" ")
+            .map((n) => n[0])
+            .join("")
+            .slice(0, 2)}
+        </div>
+        <div className="flex-1 text-left min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate">
+            {player.PLAYER_NAME}
+          </p>
+          <p className="text-[10px] text-muted-foreground font-mono">
+            {player.PTS.toFixed(1)} PTS &middot; {player.REB.toFixed(1)} REB &middot;{" "}
+            {player.AST.toFixed(1)} AST
+          </p>
+        </div>
+        {hasSelectionInCategory("Points") ||
+        hasSelectionInCategory("Rebonds") ||
+        hasSelectionInCategory("Assists") ? (
+          <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+        ) : null}
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
+      </button>
+
+      {/* Props grid */}
+      {expanded && (
+        <div className="px-4 pb-4 pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex flex-col gap-3">
+            {categories.map((cat) => {
+              const lines = generateLines(cat.avg);
+              return (
+                <div key={cat.label}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
+                    {cat.label}
+                  </p>
+                  <div className="flex gap-2">
+                    {lines.map((line) => {
+                      const odds = generateOdds(cat.avg, line);
+                      const active = isSelected(cat.label, line);
+                      return (
+                        <button
+                          key={line}
+                          type="button"
+                          onClick={() =>
+                            onSelect({
+                              playerId: player.PLAYER_ID,
+                              playerName: player.PLAYER_NAME,
+                              teamTricode,
+                              category: cat.label,
+                              line,
+                              odds,
+                            })
+                          }
+                          className={`flex-1 flex flex-col items-center gap-0.5 rounded-lg border py-2.5 px-2 transition-all duration-200 ${
+                            active
+                              ? "bg-primary/15 border-primary shadow-[0_0_12px_-4px_hsl(var(--primary)/0.4)] ring-1 ring-primary/50"
+                              : "bg-secondary/30 border-border hover:border-primary/30 hover:bg-secondary/60"
+                          }`}
+                        >
+                          <span
+                            className={`text-sm font-bold font-mono ${
+                              active ? "text-primary" : "text-foreground"
+                            }`}
+                          >
+                            +{line}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono ${
+                              active
+                                ? "text-primary/80"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {odds.toFixed(2)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Player Props Component ───
+export function PlayerProps({
+  awayPlayers,
+  homePlayers,
+  awayTricode,
+  homeTricode,
+  awayColor,
+  homeColor,
+}: {
+  awayPlayers: NbaPlayerLocalStats[];
+  homePlayers: NbaPlayerLocalStats[];
+  awayTricode: string;
+  homeTricode: string;
+  awayColor: string;
+  homeColor: string;
+}) {
+  const [selections, setSelections] = useState<BetSelection[]>([]);
+  const [stake, setStake] = useState("");
+  const [activeTeam, setActiveTeam] = useState<"away" | "home">("away");
+
+  // Top 8 players per team sorted by minutes
+  const awayTop8 = useMemo(
+    () => awayPlayers.filter((p) => p.MIN > 0).slice(0, 8),
+    [awayPlayers]
+  );
+  const homeTop8 = useMemo(
+    () => homePlayers.filter((p) => p.MIN > 0).slice(0, 8),
+    [homePlayers]
+  );
+
+  function handleSelect(sel: BetSelection) {
+    setSelections((prev) => {
+      // If same player + same category exists, remove it first
+      const filtered = prev.filter(
+        (s) =>
+          !(s.playerId === sel.playerId && s.category === sel.category)
+      );
+      // If the removed item was the exact same (toggle off), just return filtered
+      const wasExact = prev.some(
+        (s) =>
+          s.playerId === sel.playerId &&
+          s.category === sel.category &&
+          s.line === sel.line
+      );
+      if (wasExact) return filtered;
+      // Otherwise add the new selection
+      return [...filtered, sel];
+    });
+  }
+
+  function handleRemove(sel: BetSelection) {
+    setSelections((prev) =>
+      prev.filter(
+        (s) =>
+          !(s.playerId === sel.playerId && s.category === sel.category)
+      )
+    );
+  }
+
+  function handleClear() {
+    setSelections([]);
+    setStake("");
+  }
+
+  const currentPlayers = activeTeam === "away" ? awayTop8 : homeTop8;
+  const currentTricode = activeTeam === "away" ? awayTricode : homeTricode;
+  const currentColor = activeTeam === "away" ? awayColor : homeColor;
+
+  return (
+    <div className="flex gap-6 items-start">
+      {/* Left: Player Props Grid */}
+      <div className="flex-1 min-w-0">
+        {/* Team selector */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setActiveTeam("away")}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-medium transition-all ${
+              activeTeam === "away"
+                ? "bg-secondary text-foreground ring-1 ring-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <TeamLogo tricode={awayTricode} size={20} />
+            {awayTricode}
+            <span className="text-[10px] text-muted-foreground font-mono">
+              ({awayTop8.length})
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTeam("home")}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-medium transition-all ${
+              activeTeam === "home"
+                ? "bg-secondary text-foreground ring-1 ring-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <TeamLogo tricode={homeTricode} size={20} />
+            {homeTricode}
+            <span className="text-[10px] text-muted-foreground font-mono">
+              ({homeTop8.length})
+            </span>
+          </button>
+        </div>
+
+        {/* Player cards */}
+        <div className="flex flex-col gap-3">
+          {currentPlayers.map((player) => (
+            <PlayerPropCard
+              key={player.PLAYER_ID}
+              player={player}
+              teamTricode={currentTricode}
+              teamColor={currentColor}
+              selections={selections}
+              onSelect={handleSelect}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Right: Bet Slip Sidebar (desktop only) */}
+      <aside className="hidden lg:block w-[300px] shrink-0 sticky top-20">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-1 rounded-full bg-primary" />
+              <h3 className="text-sm font-bold text-foreground">
+                Calculatrice de Pari
+              </h3>
+            </div>
+            {selections.length > 0 && (
+              <span className="flex items-center justify-center h-5 min-w-[20px] rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5">
+                {selections.length}
+              </span>
+            )}
+          </div>
+          <BetSlipContent
+            selections={selections}
+            stake={stake}
+            onStakeChange={setStake}
+            onRemove={handleRemove}
+            onClear={handleClear}
+          />
+        </div>
+      </aside>
+
+      {/* Mobile: Floating bet slip button + Drawer */}
+      <div className="lg:hidden fixed bottom-4 right-4 z-40">
+        <Drawer>
+          <DrawerTrigger asChild>
+            <button
+              type="button"
+              className="relative flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all"
+            >
+              <Calculator className="h-4 w-4" />
+              Pari
+              {selections.length > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 min-w-[20px] rounded-full bg-foreground text-background text-[10px] font-bold px-1">
+                  {selections.length}
+                </span>
+              )}
+            </button>
+          </DrawerTrigger>
+          <DrawerContent className="max-h-[85vh]">
+            <DrawerHeader className="pb-2">
+              <DrawerTitle className="flex items-center gap-2">
+                <div className="h-5 w-1 rounded-full bg-primary" />
+                Calculatrice de Pari
+                {selections.length > 0 && (
+                  <span className="flex items-center justify-center h-5 min-w-[20px] rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5">
+                    {selections.length}
+                  </span>
+                )}
+              </DrawerTitle>
+              <DrawerDescription>
+                Selectionne des props puis entre ta mise
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="px-4 pb-6 overflow-y-auto">
+              <BetSlipContent
+                selections={selections}
+                stake={stake}
+                onStakeChange={setStake}
+                onRemove={handleRemove}
+                onClear={handleClear}
+              />
+            </div>
+            <DrawerClose className="sr-only">Fermer</DrawerClose>
+          </DrawerContent>
+        </Drawer>
+      </div>
+    </div>
+  );
+}
