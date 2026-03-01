@@ -104,11 +104,20 @@ function BetSlipContent({
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-foreground truncate">
-                      {sel.playerName}
+                      {sel.playerId === 0 ? sel.teamTricode : sel.playerName}
                     </p>
                     <p className="text-[10px] text-muted-foreground">
-                      {sel.category} +{sel.line} &middot;{" "}
-                      <span className="text-primary font-bold">{sel.teamTricode}</span>
+                      {sel.playerId === 0 ? (
+                        <>
+                          {sel.category}
+                          {sel.category === "Spread" && ` (${sel.line > 0 ? "+" : ""}${sel.line})`}
+                        </>
+                      ) : (
+                        <>
+                          {sel.category} +{sel.line} &middot;{" "}
+                          <span className="text-primary font-bold">{sel.teamTricode}</span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <span className="text-xs font-mono font-bold text-primary shrink-0">
@@ -360,15 +369,23 @@ function GameOddsBanner({
   odds,
   awayTricode,
   homeTricode,
-  awayColor,
-  homeColor,
+  selections,
+  onSelect,
 }: {
   odds: GameOdds | null;
   awayTricode: string;
   homeTricode: string;
-  awayColor: string;
-  homeColor: string;
+  selections: BetSelection[];
+  onSelect: (sel: BetSelection) => void;
 }) {
+  const isSelected = (category: string, teamTricode: string) =>
+    selections.some(
+      (s) =>
+        s.playerId === 0 &&
+        s.category === category &&
+        s.teamTricode === teamTricode
+    );
+
   if (!odds) {
     return (
       <div className="rounded-xl border border-border bg-card p-4 mb-5 animate-pulse">
@@ -388,6 +405,37 @@ function GameOddsBanner({
   const homeMoneyline = odds.tricode_odds[homeTricode] || 0;
   const awayIsFav = awayMoneyline > 0 && awayMoneyline < homeMoneyline;
   const homeIsFav = homeMoneyline > 0 && homeMoneyline < awayMoneyline;
+
+  const awayMLActive = isSelected("Moneyline", awayTricode);
+  const homeMLActive = isSelected("Moneyline", homeTricode);
+  const awaySpreadActive = isSelected("Spread", awayTricode);
+  const homeSpreadActive = isSelected("Spread", homeTricode);
+
+  function selectMoneyline(tricode: string, mlOdds: number) {
+    if (mlOdds <= 0) return;
+    onSelect({
+      playerId: 0,
+      playerName: tricode,
+      teamTricode: tricode,
+      category: "Moneyline",
+      line: 0,
+      odds: mlOdds,
+    });
+  }
+
+  function selectSpread(tricode: string, point: number, spreadOdds: number) {
+    if (spreadOdds <= 0) return;
+    onSelect({
+      playerId: 0,
+      playerName: `${tricode} ${point > 0 ? "+" : ""}${point}`,
+      teamTricode: tricode,
+      category: "Spread",
+      line: point,
+      odds: spreadOdds,
+    });
+  }
+
+  const activeRing = "bg-primary/15 border-primary shadow-[0_0_12px_-4px_hsl(var(--primary)/0.4)] ring-1 ring-primary/50";
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden mb-5">
@@ -421,51 +469,71 @@ function GameOddsBanner({
           </div>
           <div className="flex gap-2">
             {/* Away moneyline */}
-            <div
-              className={`flex-1 flex flex-col items-center gap-1 rounded-lg border py-3 px-2 transition-all ${
-                awayIsFav
-                  ? "border-emerald-500/40 bg-emerald-500/5"
-                  : "border-border bg-secondary/20"
+            <button
+              type="button"
+              disabled={awayMoneyline <= 0}
+              onClick={() => selectMoneyline(awayTricode, awayMoneyline)}
+              className={`flex-1 flex flex-col items-center gap-1 rounded-lg border py-3 px-2 transition-all duration-200 cursor-pointer ${
+                awayMLActive
+                  ? activeRing
+                  : awayIsFav
+                    ? "border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10"
+                    : "border-border bg-secondary/20 hover:bg-secondary/40"
               }`}
             >
               <TeamLogo tricode={awayTricode} size={24} />
               <span className="text-xs font-bold text-foreground">{awayTricode}</span>
               <span
                 className={`text-lg font-mono font-bold ${
-                  awayIsFav ? "text-emerald-500" : "text-foreground"
+                  awayMLActive ? "text-primary" : awayIsFav ? "text-emerald-500" : "text-foreground"
                 }`}
               >
                 {awayMoneyline > 0 ? awayMoneyline.toFixed(2) : "--"}
               </span>
-              {awayIsFav && (
+              {awayIsFav && !awayMLActive && (
                 <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 bg-emerald-500/10 rounded px-1.5 py-0.5">
                   Favori
                 </span>
               )}
-            </div>
+              {awayMLActive && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 rounded px-1.5 py-0.5">
+                  Selectionne
+                </span>
+              )}
+            </button>
             {/* Home moneyline */}
-            <div
-              className={`flex-1 flex flex-col items-center gap-1 rounded-lg border py-3 px-2 transition-all ${
-                homeIsFav
-                  ? "border-emerald-500/40 bg-emerald-500/5"
-                  : "border-border bg-secondary/20"
+            <button
+              type="button"
+              disabled={homeMoneyline <= 0}
+              onClick={() => selectMoneyline(homeTricode, homeMoneyline)}
+              className={`flex-1 flex flex-col items-center gap-1 rounded-lg border py-3 px-2 transition-all duration-200 cursor-pointer ${
+                homeMLActive
+                  ? activeRing
+                  : homeIsFav
+                    ? "border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10"
+                    : "border-border bg-secondary/20 hover:bg-secondary/40"
               }`}
             >
               <TeamLogo tricode={homeTricode} size={24} />
               <span className="text-xs font-bold text-foreground">{homeTricode}</span>
               <span
                 className={`text-lg font-mono font-bold ${
-                  homeIsFav ? "text-emerald-500" : "text-foreground"
+                  homeMLActive ? "text-primary" : homeIsFav ? "text-emerald-500" : "text-foreground"
                 }`}
               >
                 {homeMoneyline > 0 ? homeMoneyline.toFixed(2) : "--"}
               </span>
-              {homeIsFav && (
+              {homeIsFav && !homeMLActive && (
                 <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 bg-emerald-500/10 rounded px-1.5 py-0.5">
                   Favori
                 </span>
               )}
-            </div>
+              {homeMLActive && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 rounded px-1.5 py-0.5">
+                  Selectionne
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -479,37 +547,81 @@ function GameOddsBanner({
           </div>
           <div className="flex gap-2">
             {/* Away spread */}
-            <div className="flex-1 flex flex-col items-center gap-1 rounded-lg border border-border bg-secondary/20 py-3 px-2">
+            <button
+              type="button"
+              disabled={odds.spread.away.odds <= 0}
+              onClick={() => selectSpread(awayTricode, odds.spread.away.point, odds.spread.away.odds)}
+              className={`flex-1 flex flex-col items-center gap-1.5 rounded-lg border py-3 px-2 transition-all duration-200 cursor-pointer ${
+                awaySpreadActive
+                  ? activeRing
+                  : "border-border bg-secondary/20 hover:bg-secondary/40"
+              }`}
+            >
               <TeamLogo tricode={awayTricode} size={24} />
               <span className="text-xs font-bold text-foreground">{awayTricode}</span>
               <span
-                className={`text-lg font-mono font-bold ${
-                  odds.spread.away.point < 0 ? "text-emerald-500" : "text-rose-400"
+                className={`text-base font-mono font-bold ${
+                  awaySpreadActive
+                    ? "text-primary"
+                    : odds.spread.away.point < 0
+                      ? "text-emerald-500"
+                      : "text-rose-400"
                 }`}
               >
                 {odds.spread.away.point > 0 ? "+" : ""}
                 {odds.spread.away.point}
               </span>
-              <span className="text-[10px] font-mono text-muted-foreground">
+              <span
+                className={`text-base font-mono font-bold ${
+                  awaySpreadActive ? "text-primary/80" : "text-foreground"
+                }`}
+              >
                 {odds.spread.away.odds > 0 ? odds.spread.away.odds.toFixed(2) : "--"}
               </span>
-            </div>
+              {awaySpreadActive && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 rounded px-1.5 py-0.5">
+                  Selectionne
+                </span>
+              )}
+            </button>
             {/* Home spread */}
-            <div className="flex-1 flex flex-col items-center gap-1 rounded-lg border border-border bg-secondary/20 py-3 px-2">
+            <button
+              type="button"
+              disabled={odds.spread.home.odds <= 0}
+              onClick={() => selectSpread(homeTricode, odds.spread.home.point, odds.spread.home.odds)}
+              className={`flex-1 flex flex-col items-center gap-1.5 rounded-lg border py-3 px-2 transition-all duration-200 cursor-pointer ${
+                homeSpreadActive
+                  ? activeRing
+                  : "border-border bg-secondary/20 hover:bg-secondary/40"
+              }`}
+            >
               <TeamLogo tricode={homeTricode} size={24} />
               <span className="text-xs font-bold text-foreground">{homeTricode}</span>
               <span
-                className={`text-lg font-mono font-bold ${
-                  odds.spread.home.point < 0 ? "text-emerald-500" : "text-rose-400"
+                className={`text-base font-mono font-bold ${
+                  homeSpreadActive
+                    ? "text-primary"
+                    : odds.spread.home.point < 0
+                      ? "text-emerald-500"
+                      : "text-rose-400"
                 }`}
               >
                 {odds.spread.home.point > 0 ? "+" : ""}
                 {odds.spread.home.point}
               </span>
-              <span className="text-[10px] font-mono text-muted-foreground">
+              <span
+                className={`text-base font-mono font-bold ${
+                  homeSpreadActive ? "text-primary/80" : "text-foreground"
+                }`}
+              >
                 {odds.spread.home.odds > 0 ? odds.spread.home.odds.toFixed(2) : "--"}
               </span>
-            </div>
+              {homeSpreadActive && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 rounded px-1.5 py-0.5">
+                  Selectionne
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -568,12 +680,26 @@ export function PlayerProps({
 
   function handleSelect(sel: BetSelection) {
     setSelections((prev) => {
-      // If same player + same category exists, remove it first
+      // For game-level bets (Moneyline/Spread): only one team per category
+      if (sel.playerId === 0) {
+        const filtered = prev.filter(
+          (s) => !(s.playerId === 0 && s.category === sel.category)
+        );
+        const wasExact = prev.some(
+          (s) =>
+            s.playerId === 0 &&
+            s.category === sel.category &&
+            s.teamTricode === sel.teamTricode
+        );
+        if (wasExact) return filtered;
+        return [...filtered, sel];
+      }
+
+      // For player-level bets: same player + same category
       const filtered = prev.filter(
         (s) =>
           !(s.playerId === sel.playerId && s.category === sel.category)
       );
-      // If the removed item was the exact same (toggle off), just return filtered
       const wasExact = prev.some(
         (s) =>
           s.playerId === sel.playerId &&
@@ -581,17 +707,18 @@ export function PlayerProps({
           s.line === sel.line
       );
       if (wasExact) return filtered;
-      // Otherwise add the new selection
       return [...filtered, sel];
     });
   }
 
   function handleRemove(sel: BetSelection) {
     setSelections((prev) =>
-      prev.filter(
-        (s) =>
-          !(s.playerId === sel.playerId && s.category === sel.category)
-      )
+      prev.filter((s) => {
+        if (sel.playerId === 0) {
+          return !(s.playerId === 0 && s.category === sel.category && s.teamTricode === sel.teamTricode);
+        }
+        return !(s.playerId === sel.playerId && s.category === sel.category);
+      })
     );
   }
 
@@ -613,8 +740,8 @@ export function PlayerProps({
           odds={gameOdds}
           awayTricode={awayTricode}
           homeTricode={homeTricode}
-          awayColor={awayColor}
-          homeColor={homeColor}
+          selections={selections}
+          onSelect={handleSelect}
         />
 
         {/* Team selector */}
