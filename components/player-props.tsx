@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { NbaPlayerLocalStats } from "@/lib/nba-local-data";
 import { TeamLogo } from "@/components/team-logo";
 import { PlayerHeadshot } from "@/components/player-headshot";
-import { X, Trash2, Calculator, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Trash2, Calculator, ChevronDown, ChevronUp, Trophy, ArrowLeftRight } from "lucide-react";
 import {
   Drawer,
   DrawerClose,
@@ -344,6 +344,179 @@ function PlayerPropCard({
   );
 }
 
+// ─── Game Odds Types ───
+interface GameOdds {
+  home_tricode: string;
+  away_tricode: string;
+  tricode_odds: Record<string, number>;
+  spread: {
+    home: { point: number; odds: number };
+    away: { point: number; odds: number };
+  };
+}
+
+// ─── Game Odds Banner (Moneyline + Spread) ───
+function GameOddsBanner({
+  odds,
+  awayTricode,
+  homeTricode,
+  awayColor,
+  homeColor,
+}: {
+  odds: GameOdds | null;
+  awayTricode: string;
+  homeTricode: string;
+  awayColor: string;
+  homeColor: string;
+}) {
+  if (!odds) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4 mb-5 animate-pulse">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-4 w-4 rounded bg-secondary" />
+          <div className="h-4 w-32 rounded bg-secondary" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-20 rounded-lg bg-secondary" />
+          <div className="h-20 rounded-lg bg-secondary" />
+        </div>
+      </div>
+    );
+  }
+
+  const awayMoneyline = odds.tricode_odds[awayTricode] || 0;
+  const homeMoneyline = odds.tricode_odds[homeTricode] || 0;
+  const awayIsFav = awayMoneyline > 0 && awayMoneyline < homeMoneyline;
+  const homeIsFav = homeMoneyline > 0 && homeMoneyline < awayMoneyline;
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden mb-5">
+      {/* Header row */}
+      <div className="px-4 py-3 border-b border-border bg-secondary/30 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <TeamLogo tricode={awayTricode} size={22} />
+            <span className="text-sm font-bold text-foreground">{awayTricode}</span>
+          </div>
+          <span className="text-xs font-medium text-muted-foreground">VS</span>
+          <div className="flex items-center gap-2">
+            <TeamLogo tricode={homeTricode} size={22} />
+            <span className="text-sm font-bold text-foreground">{homeTricode}</span>
+          </div>
+        </div>
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
+          Cotes du match
+        </span>
+      </div>
+
+      {/* Odds grid */}
+      <div className="grid grid-cols-2 gap-px bg-border">
+        {/* MONEYLINE */}
+        <div className="bg-card p-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Trophy className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Vainqueur (Moneyline)
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {/* Away moneyline */}
+            <div
+              className={`flex-1 flex flex-col items-center gap-1 rounded-lg border py-3 px-2 transition-all ${
+                awayIsFav
+                  ? "border-emerald-500/40 bg-emerald-500/5"
+                  : "border-border bg-secondary/20"
+              }`}
+            >
+              <TeamLogo tricode={awayTricode} size={24} />
+              <span className="text-xs font-bold text-foreground">{awayTricode}</span>
+              <span
+                className={`text-lg font-mono font-bold ${
+                  awayIsFav ? "text-emerald-500" : "text-foreground"
+                }`}
+              >
+                {awayMoneyline > 0 ? awayMoneyline.toFixed(2) : "--"}
+              </span>
+              {awayIsFav && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 bg-emerald-500/10 rounded px-1.5 py-0.5">
+                  Favori
+                </span>
+              )}
+            </div>
+            {/* Home moneyline */}
+            <div
+              className={`flex-1 flex flex-col items-center gap-1 rounded-lg border py-3 px-2 transition-all ${
+                homeIsFav
+                  ? "border-emerald-500/40 bg-emerald-500/5"
+                  : "border-border bg-secondary/20"
+              }`}
+            >
+              <TeamLogo tricode={homeTricode} size={24} />
+              <span className="text-xs font-bold text-foreground">{homeTricode}</span>
+              <span
+                className={`text-lg font-mono font-bold ${
+                  homeIsFav ? "text-emerald-500" : "text-foreground"
+                }`}
+              >
+                {homeMoneyline > 0 ? homeMoneyline.toFixed(2) : "--"}
+              </span>
+              {homeIsFav && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 bg-emerald-500/10 rounded px-1.5 py-0.5">
+                  Favori
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* SPREAD */}
+        <div className="bg-card p-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <ArrowLeftRight className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Spread (Handicap)
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {/* Away spread */}
+            <div className="flex-1 flex flex-col items-center gap-1 rounded-lg border border-border bg-secondary/20 py-3 px-2">
+              <TeamLogo tricode={awayTricode} size={24} />
+              <span className="text-xs font-bold text-foreground">{awayTricode}</span>
+              <span
+                className={`text-lg font-mono font-bold ${
+                  odds.spread.away.point < 0 ? "text-emerald-500" : "text-rose-400"
+                }`}
+              >
+                {odds.spread.away.point > 0 ? "+" : ""}
+                {odds.spread.away.point}
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                {odds.spread.away.odds > 0 ? odds.spread.away.odds.toFixed(2) : "--"}
+              </span>
+            </div>
+            {/* Home spread */}
+            <div className="flex-1 flex flex-col items-center gap-1 rounded-lg border border-border bg-secondary/20 py-3 px-2">
+              <TeamLogo tricode={homeTricode} size={24} />
+              <span className="text-xs font-bold text-foreground">{homeTricode}</span>
+              <span
+                className={`text-lg font-mono font-bold ${
+                  odds.spread.home.point < 0 ? "text-emerald-500" : "text-rose-400"
+                }`}
+              >
+                {odds.spread.home.point > 0 ? "+" : ""}
+                {odds.spread.home.point}
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                {odds.spread.home.odds > 0 ? odds.spread.home.odds.toFixed(2) : "--"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Player Props Component ───
 export function PlayerProps({
   awayPlayers,
@@ -363,6 +536,25 @@ export function PlayerProps({
   const [selections, setSelections] = useState<BetSelection[]>([]);
   const [stake, setStake] = useState("");
   const [activeTeam, setActiveTeam] = useState<"away" | "home">("away");
+  const [gameOdds, setGameOdds] = useState<GameOdds | null>(null);
+
+  // Fetch game odds (moneyline + spread) from the API
+  useEffect(() => {
+    fetch("/api/odds")
+      .then((r) => r.json())
+      .then((data) => {
+        for (const g of data.games || []) {
+          if (
+            g.home_tricode === homeTricode &&
+            g.away_tricode === awayTricode
+          ) {
+            setGameOdds(g);
+            break;
+          }
+        }
+      })
+      .catch(() => {});
+  }, [homeTricode, awayTricode]);
 
   // Top 8 players per team sorted by minutes
   const awayTop8 = useMemo(
@@ -416,6 +608,15 @@ export function PlayerProps({
     <div className="flex gap-6 items-start">
       {/* Left: Player Props Grid */}
       <div className="flex-1 min-w-0">
+        {/* Game Odds Banner (Moneyline + Spread) */}
+        <GameOddsBanner
+          odds={gameOdds}
+          awayTricode={awayTricode}
+          homeTricode={homeTricode}
+          awayColor={awayColor}
+          homeColor={homeColor}
+        />
+
         {/* Team selector */}
         <div className="flex items-center gap-2 mb-4">
           <button

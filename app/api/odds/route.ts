@@ -42,6 +42,7 @@ const TEAM_NAME_TO_TRICODE: Record<string, string> = {
 interface OddsOutcome {
   name: string;
   price: number;
+  point?: number;
 }
 
 interface OddsBookmaker {
@@ -77,7 +78,7 @@ function americanToDecimal(american: number): number {
 export async function GET() {
   try {
     const res = await fetch(
-      `${ODDS_API_URL}?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h&oddsFormat=american`,
+      `${ODDS_API_URL}?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h,spreads&oddsFormat=american`,
       { next: { revalidate: 0 } }
     );
 
@@ -126,6 +127,37 @@ export async function GET() {
         awayOddsAvg = Number((awayOddsAvg / count).toFixed(2));
       }
 
+      // ─── Spread data ───
+      const spreadMarkets = event.bookmakers
+        .map((b) => b.markets.find((m) => m.key === "spreads"))
+        .filter(Boolean);
+
+      let homeSpread = 0;
+      let homeSpreadOdds = 0;
+      let awaySpread = 0;
+      let awaySpreadOdds = 0;
+      let spreadCount = 0;
+
+      for (const market of spreadMarkets) {
+        if (!market) continue;
+        const homeOut = market.outcomes.find((o) => o.name === event.home_team);
+        const awayOut = market.outcomes.find((o) => o.name === event.away_team);
+        if (homeOut && awayOut && homeOut.point !== undefined && awayOut.point !== undefined) {
+          homeSpread += homeOut.point;
+          homeSpreadOdds += americanToDecimal(homeOut.price);
+          awaySpread += awayOut.point;
+          awaySpreadOdds += americanToDecimal(awayOut.price);
+          spreadCount++;
+        }
+      }
+
+      if (spreadCount > 0) {
+        homeSpread = Number((homeSpread / spreadCount).toFixed(1));
+        homeSpreadOdds = Number((homeSpreadOdds / spreadCount).toFixed(2));
+        awaySpread = Number((awaySpread / spreadCount).toFixed(1));
+        awaySpreadOdds = Number((awaySpreadOdds / spreadCount).toFixed(2));
+      }
+
       const homeTricode = getTricode(event.home_team);
       const awayTricode = getTricode(event.away_team);
 
@@ -143,6 +175,10 @@ export async function GET() {
         tricode_odds: {
           [homeTricode]: homeOddsAvg,
           [awayTricode]: awayOddsAvg,
+        },
+        spread: {
+          home: { point: homeSpread, odds: homeSpreadOdds },
+          away: { point: awaySpread, odds: awaySpreadOdds },
         },
       };
     });
