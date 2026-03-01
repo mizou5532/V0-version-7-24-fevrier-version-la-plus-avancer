@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     // For other dates, use the schedule endpoint
     const response = await fetch(NBA_SCHEDULE_URL, {
       headers: FETCH_HEADERS,
-      next: { revalidate: 3600 }, // Cache schedule for 1 hour
+      cache: "no-store",
     });
 
     if (!response.ok) {

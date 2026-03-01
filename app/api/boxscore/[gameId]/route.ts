@@ -119,7 +119,7 @@ export async function GET(
       // 2. Not in today's scoreboard — search the full season schedule
       const scheduleRes = await fetch(
         "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json",
-        { headers: FETCH_HEADERS, next: { revalidate: 3600 } }
+        { headers: FETCH_HEADERS, cache: "no-store" }
       );
 
       if (scheduleRes.ok) {
